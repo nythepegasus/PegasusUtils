@@ -6,48 +6,57 @@ PY_TO_SQLI = {None: 'NULL', bytes: 'BLOB', str: 'TEXT', float: 'REAL', int: 'INT
 # PK(U(NN(str)))
 
 class C:
-    def __init__(self, typ):
-        self.type = typ
+    def __init__(self, t):
+        self.type = t
 
     def __repr__(self):
-        print(f"{self.__class__.__name__}({self.type})")
-        if getattr(self.type, 'type', 1) == 1:
-            return f"{self.__class__.__name__}({PY_TO_SQLI[self.type]})"
+        # print(f"{self.__class__.__name__}({self.type})")
+        if self.type in PY_TO_SQLI:
+            return f"{self.__class__.__name__}({self._type})"
         else:
             return f"{self.__class__.__name__}({self.type})"
 
     @property
     def _type(self):
-        typ = self
-        while getattr(typ, 'type', 1) != 1:
-            typ = typ.type
-
-        return PY_TO_SQLI[typ]
+        if self.type in PY_TO_SQLI:
+            return PY_TO_SQLI[self.type]
+        else:
+            check = self.type
+            while check.type not in PY_TO_SQLI:
+                check = check.type
+            return PY_TO_SQLI[check.type]
 
     @property
     def schema(self):
         cons = []
-        typ = self
-        while getattr(typ, 'type', 1) != 1:
-            cons.append(getattr(typ, '_schema', ''))
-            typ = typ.type
-        ret = f" {self._type}"
+        constraint = self.type
+        while constraint.type not in PY_TO_SQLI:
+            cons.append(constraint._schema)
+            constraint = constraint.type
+        cons.append(constraint._schema)
+        ret = self._schema
+
         if " PRIMARY KEY" in cons:
             ret += " PRIMARY KEY"
+
         if " UNIQUE" in cons:
             ret += " UNIQUE"
+        
         if " NULL" in cons:
-            if "NOT NULL" in cons:
-                raise Exception("??")
             ret += " NULL"
         if " NOT NULL" in cons:
-            if "NULL" in cons:
-                raise Exception("??")
             ret += " NOT NULL"
+        if " NOT NULL" in cons and " NULL" in cons:
+            raise Exception("??")
+
         if "FOREIGN KEY" in getattr(self, '_schema', ''):
             ret += ",\n"
             ret += self._schema
         return ret
+
+    @property
+    def _schema(self):
+        return f" {self._type}"
 
 
 class PK(C):
